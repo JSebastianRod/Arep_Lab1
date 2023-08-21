@@ -1,0 +1,7 @@
+edu\escuelaing\arep\app1\HttpServer.class
+edu\escuelaing\arep\app1\URLReader.class
+edu\escuelaing\arep\app1\HttpGetter.class
+edu\escuelaing\arep\app1\EchoServer.class
+edu\escuelaing\arep\app1\ServerCache.class
+edu\escuelaing\arep\app1\App.class
+edu\escuelaing\arep\app1\EchoClient.class

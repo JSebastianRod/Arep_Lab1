@@ -1,12 +1,12 @@
 package edu.escuelaing.arep.app1;
 
 import java.net.*;
+
 import java.io.*;
 import java.util.HashMap;
 import org.json.JSONArray;
 import org.json.JSONObject;
-
-import netscape.javascript.JSObject;
+import edu.escuelaing.arep.app1.ServerCache;
 
 public class HttpServer {
     public static void main(String[] args) throws IOException {
@@ -34,41 +34,51 @@ public class HttpServer {
             String inputLine, outputLine;
             boolean firstLine = true;
             String uriString = "";
-            
+            ServerCache cache = new ServerCache();
+
             while ((inputLine = in.readLine()) != null) {
-                System.out.println("Received: " + inputLine);
-                if (firstLine) {
-                    firstLine = false;
-                    uriString = inputLine.split(" ")[1];
+                if (inputLine.contains("hello?name=")) {
+                    String[] res = inputLine.split("name=");
+                    uriString = (res[1].split("HTTP")[0]).replace(" ", "");
                 }
+                System.out.println("Received: " + inputLine);
                 if (!in.ready()) {
                     break;
                 }
             }
 
             if (!uriString.equals("")) {
-                String answer = HttpGetter.getMovie(uriString);
-                outputLine = "HTTP/1.1 200 OK\r\n"
-                        + "Content-Type: text/html\r\n"
-                        + "\r\n"
-                        + "<br>"
-                        + "<table border=\" 0.5 \"> \n "
-                        + data(answer)
-                        + "</table>";
-            } else {
-                outputLine = "HTTP/1.1 200 OK\r\n"
-                        + "Content-Type: text/html\r\n"
-                        + "\r\n"
-                        + getIndexResponse();
-            }
-            System.out.println("URI: " + uriString);
-            if (uriString.startsWith("/hello?")) {
-                outputLine = getHello(uriString);
+                if (cache.containsKey(uriString)) {
+                    System.out.println("Ya existe en cache");
+                    outputLine = "HTTP/1.1 200 OK\r\n"
+                            + "Content-Type: text/html\r\n"
+                            + "\r\n"
+                            + "<br>"
+                            + "<table border=\" 1 \"> \n "
+                            + data(cache.getCache(uriString))
+                            + "</table>"
+                            + "<br>"
+                            + "<h3>Datos tomados de nuestro cache</h3>\n";
+                    cache.printMap();
+                } else {
+                    System.out.println("No existe en cache");
+                    String answer = HttpGetter.getMovie(uriString);
+                    outputLine = "HTTP/1.1 200 OK\r\n"
+                            + "Content-Type: text/html\r\n"
+                            + "\r\n"
+                            + "<br>"
+                            + "<table border=\" 1 \"> \n "
+                            + data(answer)
+                            + "</table>"
+                            + "<br>"
+                            + "<h3>Datos tomados de la api http://www.omdbapi.com, agradezco su colaboracion</h3>\n";
+                    cache.setCache(uriString);
+                    System.out.println("Se agrego a cache");
+                }
             } else {
                 outputLine = getIndexResponse();
             }
             out.println(outputLine);
-
             out.close();
             in.close();
             clientSocket.close();
@@ -77,34 +87,23 @@ public class HttpServer {
     }
 
     private static String data(String answer) {
-        HashMap<String, String> dict = new HashMap<String,String>();
+        HashMap<String, String> hash = new HashMap<String, String>();
         JSONArray arr = new JSONArray(answer);
         for (int i = 0; i < arr.length(); i++) {
             JSONObject object = arr.getJSONObject(i);
             for (String key : object.keySet()) {
-                dict.put(key.toString(), object.get(key).toString());
+                hash.put(key.toString(), object.get(key).toString());
             }
         }
-        String table = "<tr> \n";
-        for (String key : dict.keySet()) {
-            String value = dict.get(key);
-            table += "<tr> \n"
+        String dataTable = "<tr> \n";
+        for (String key : hash.keySet()) {
+            String value = hash.get(key);
+            dataTable += "<tr> \n"
                     + "<td>" + key + "</td> \n"
                     + "<td>" + value + "</td> \n"
                     + "</tr> \n";
         }
-        return table;
-    }
-
-    public static String getHello(String uri) {
-        String response = "HTTP/1.1 200 OK \r\n"
-                + "Content-Type: text/html\r\n"
-                + "\r\n"
-                + "{ \"msg\": \"Hello Pedro\" }"
-                + "<table border=\" 0.5 \"> \n "
-                + data(answer)
-                + "</table>";
-        return response;
+        return dataTable;
     }
 
     public static String getIndexResponse() {
@@ -119,28 +118,26 @@ public class HttpServer {
                 + "        <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
                 + "    </head>\n"
                 + "    <body>\n"
-                + "        <h1>Movie finder</h1>\n"
+                + "        <h1>Movie Finder</h1>\n"
+                + "        <h2>Source for movies</h2>\n"
                 + "        <form action=\"/hello\">\n"
-                + "            <label for=\"name\">Name:</label><br>\n"
+                + "            <label for=\"name\">Name of the movie:</label><br>\n"
                 + "            <input type=\"text\" id=\"name\" name=\"name\" value=\"The Batman\"><br><br>\n"
                 + "            <input type=\"button\" value=\"Submit\" onclick=\"loadGetMsg()\">\n"
                 + "        </form>\n"
                 + "        <div id=\"getrespmsg\"></div>\n"
-                + "    <script>\n" +
-                "            function loadGetMsg() {\n" +
-                "                let nameVar = document.getElementById(\"name\").value;\n" +
-                "                if (nameVar) {\n" +
-                "                   console.log(\"Nombre \" + nameVar)\n" +
-                "                   const xhttp = new XMLHttpRequest();\n" +
-                "                   xhttp.onload = function() {\n" +
-                "                       document.getElementById(\"getrespmsg\").innerHTML =\n" +
-                "                       this.responseText;\n" +
-                "                   }\n" +
-                "                   xhttp.open(\"GET\", \"/hello?name=\"+nameVar);\n" +
-                "                   xhttp.send();\n" +
-                "                };\n" +
-                "            }\n" +
-                "        </script>\n"
+                + "      <script>\n"
+                + "            function loadGetMsg() {\n"
+                + "                let nameVar = document.getElementById(\"name\").value;\n"
+                + "                const xhttp = new XMLHttpRequest();\n"
+                + "                xhttp.onload = function() {\n"
+                + "                    document.getElementById(\"getrespmsg\").innerHTML =\n"
+                + "                    this.responseText;\n"
+                + "                } \n"
+                + "                xhttp.open(\"GET\", \"/hello?name=\"+nameVar);\n"
+                + "                xhttp.send();\n"
+                + "            }\n"
+                + "      </script>\n"
                 + "    </body>\n"
                 + "</html>\n";
         return response;
